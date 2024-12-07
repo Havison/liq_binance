@@ -29,7 +29,7 @@ async def message_bybit_binance(tg_id, symbol, liquidation_type, liquidation, pr
                  f'{sml[liquidation_type]} {liquidation_type} <b>{symbol[0:-4]}</b>\n'
                  f'Liquidation amount: <b>{liquidation} USDT</b>\n'
                  f'Price: {price}\n'
-                 f'<a href=\"{binance}\">Binance</a> | <a href=\"{coinglass}\">CoinGlass</a> | <a href=\"{bybit}\">ByBit</a>',
+                 f'⚫<a href=\"{bybit}\">ByBit</a> | 🌕<a href=\"{binance}\">Binance</a> | 🧿<a href=\"{coinglass}\">CoinGlass</a>',
             parse_mode=ParseMode.HTML,
             disable_web_page_preview=True
         )
@@ -47,8 +47,11 @@ async def message_binance(tg_id, symbol, liquidation_type, liquidation, price):
         # Отправка сообщения
         await bot.send_message(
             chat_id=tg_id,
-            text=f'🌕Binance: {sml[liquidation_type]} {liquidation_type} <b>{symbol[0:-4]}</b>, liquidation amount: {liquidation} USDT price: {price}\n'
-                 f'<a href=\"{binance}\">Binance</a> | <a href=\"{coinglass}\">CoinGlass</a>',
+            text=f'🌕Binance\n'
+                 f'{sml[liquidation_type]} {liquidation_type} <b>{symbol[0:-4]}</b>\n'
+                 f'Liquidation amount: <b>{liquidation} USDT</b>\n'
+                 f'Price: {price}\n'
+                 f'🌕<a href=\"{binance}\">Binance</a> | 🧿<a href=\"{coinglass}\">CoinGlass</a>',
             parse_mode=ParseMode.HTML,
             disable_web_page_preview=True
         )
