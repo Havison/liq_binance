@@ -125,10 +125,13 @@ ssl_context = ssl.create_default_context()
 ssl_context.check_hostname = False
 ssl_context.verify_mode = ssl.CERT_NONE
 
+
 async def main():
     try:
+
         # Запуск фонового обновления данных
-        await asyncio.create_task(update_symbols())
+        asyncio.create_task(update_symbols())
+
 
         # Подключение к WebSocket
         async with websockets.connect(url, ssl=ssl_context) as ws:
