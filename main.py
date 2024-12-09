@@ -18,7 +18,8 @@ logger.setLevel(logging.INFO)
 
 # Лимит суммы ликвидации для уведомлений
 LIQUIDATION_LIMIT = 15000
-TOP_50_BINANCE = []  # Здесь будет динамически обновляемый список топ-50
+TOP_50_BINANCE = []  # Список топ-50 торговых пар Binance
+bybit_symbol = []  # Список всех фьючерсных монет Bybit
 
 config: Config = load_config('.env')
 session = HTTP(
@@ -27,41 +28,54 @@ session = HTTP(
     api_secret=config.by_bit.api_secret,
 )
 
-data_bybit = session.get_tickers(category="linear")
-bybit_symbol = [dicts['symbol'] for dicts in data_bybit['result']['list']
-                if 'USDT' in dicts['symbol']]
-
 
 # Функция для получения топ-50 торговых пар с Binance
 async def fetch_top_50_binance():
-    url = "https://api.binance.com/api/v3/ticker/24hr"
-    async with httpx.AsyncClient() as client:
-        response = await client.get(url)
-        data = response.json()
+    try:
+        url = "https://api.binance.com/api/v3/ticker/24hr"
+        async with httpx.AsyncClient() as client:
+            response = await client.get(url)
+            data = response.json()
 
-        # Отбор торговых пар с USDT и сортировка по объему
-        usdt_pairs = [
-            {
-                "symbol": ticker["symbol"],
-                "volume": float(ticker["quoteVolume"])
-            }
-            for ticker in data if ticker["symbol"].endswith("USDT")
+            # Отбор торговых пар с USDT и сортировка по объему
+            usdt_pairs = [
+                {
+                    "symbol": ticker["symbol"],
+                    "volume": float(ticker["quoteVolume"])
+                }
+                for ticker in data if ticker["symbol"].endswith("USDT")
+            ]
+            sorted_pairs = sorted(usdt_pairs, key=lambda x: x["volume"], reverse=True)
+            global TOP_50_BINANCE
+            TOP_50_BINANCE = [pair["symbol"] for pair in sorted_pairs[:50]]
+            logger.info(f"Обновлен топ-50 Binance: {TOP_50_BINANCE}")
+    except Exception as e:
+        logger.error(f"Ошибка при получении топ-50 Binance: {e}")
+
+
+# Функция для получения всех фьючерсных монет Bybit
+async def fetch_bybit_symbols():
+    try:
+        global bybit_symbol
+        data_bybit = session.get_tickers(category="linear")
+        bybit_symbol = [
+            dicts['symbol'] for dicts in data_bybit['result']['list']
+            if 'USDT' in dicts['symbol']
         ]
-        sorted_pairs = sorted(usdt_pairs, key=lambda x: x["volume"], reverse=True)
-        global TOP_50_BINANCE
-        TOP_50_BINANCE = [pair["symbol"] for pair in sorted_pairs[:50]]
-        logger.info(f"Обновлен топ-50 Binance: {TOP_50_BINANCE}")
+        logger.info(f"Обновлен список всех монет Bybit: {bybit_symbol}")
+    except Exception as e:
+        logger.error(f"Ошибка при получении списка монет Bybit: {e}")
 
-
-# Функция для обновления топ-50 каждые 24 часа
-async def update_top_50_binance():
+# Функция для обновления топ-50 Binance и списка монет Bybit каждые 24 часа
+async def update_symbols():
     while True:
         try:
-            logger.info("Обновление топ-50 торговых пар Binance...")
+            logger.info("Обновление данных Binance и Bybit...")
             await fetch_top_50_binance()
-            logger.info("Топ-50 успешно обновлен.")
+            await fetch_bybit_symbols()
+            logger.info("Данные Binance и Bybit успешно обновлены.")
         except Exception as e:
-            logger.error(f"Ошибка при обновлении топ-50 Binance: {e}")
+            logger.error(f"Ошибка при обновлении данных: {e}")
         await asyncio.sleep(24 * 60 * 60)  # Обновление каждые 24 часа
 
 
@@ -106,17 +120,15 @@ async def on_open(ws):
     except Exception as e:
         logger.error(f"Ошибка при подписке на ликвидации: {e}")
 
-
 url = "wss://fstream.binance.com/ws"  # WebSocket Binance для фьючерсов
 ssl_context = ssl.create_default_context()
 ssl_context.check_hostname = False
 ssl_context.verify_mode = ssl.CERT_NONE
 
-
 async def main():
     try:
-        # Запуск фонового обновления топ-50
-        asyncio.create_task(update_top_50_binance())
+        # Запуск фонового обновления данных
+        await asyncio.create_task(update_symbols())
 
         # Подключение к WebSocket
         async with websockets.connect(url, ssl=ssl_context) as ws:
@@ -128,7 +140,6 @@ async def main():
                 await on_message(message)
     except Exception as e:
         logger.critical(f"Критическая ошибка в основном цикле: {e}")
-
 
 if __name__ == "__main__":
     asyncio.run(main())
