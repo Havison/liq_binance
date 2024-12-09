@@ -18,6 +18,7 @@ logger.setLevel(logging.INFO)
 
 # Лимит суммы ликвидации для уведомлений
 LIQUIDATION_LIMIT = 15000
+TOP_50_BYBIT = []
 TOP_50_BINANCE = []  # Список топ-50 торговых пар Binance
 bybit_symbol = []  # Список всех фьючерсных монет Bybit
 
@@ -29,7 +30,27 @@ session = HTTP(
 )
 
 
+async def fetch_top_50_bybit():
+    try:
+        logger.info("Запрос топ-50 торговых пар с Bybit...")
+        data_bybit = session.get_tickers(category="linear")
+        usdt_pairs = [
+            {
+                "symbol": ticker["symbol"],
+                "volume_24h": float(ticker["turnover24h"])  # Оборот за 24 часа
+            }
+            for ticker in data_bybit["result"]["list"]
+            if "USDT" in ticker["symbol"]
+        ]
+        sorted_pairs = sorted(usdt_pairs, key=lambda x: x["volume_24h"], reverse=True)
+        global TOP_50_BYBIT
+        TOP_50_BYBIT = [pair["symbol"] for pair in sorted_pairs[:50]]
+        logger.info(f"Обновлен топ-50 Bybit: {TOP_50_BYBIT}")
+    except Exception as e:
+        logger.error(f"Ошибка при обновлении топ-50 Bybit: {e}")
 # Функция для получения топ-50 торговых пар с Binance
+
+
 async def fetch_top_50_binance():
     try:
         url = "https://api.binance.com/api/v3/ticker/24hr"
@@ -66,12 +87,14 @@ async def fetch_bybit_symbols():
     except Exception as e:
         logger.error(f"Ошибка при получении списка монет Bybit: {e}")
 
+
 # Функция для обновления топ-50 Binance и списка монет Bybit каждые 24 часа
 async def update_symbols():
     while True:
         try:
             logger.info("Обновление данных Binance и Bybit...")
             await fetch_top_50_binance()
+            await fetch_top_50_bybit()
             await fetch_bybit_symbols()
             logger.info("Данные Binance и Bybit успешно обновлены.")
         except Exception as e:
@@ -89,7 +112,8 @@ async def on_message(message):
             qty = float(order["q"])  # Количество монет
             price = float(order["p"])  # Цена ликвидации
             notional = qty * price  # Сумма ликвидации в USDT
-            if notional >= LIQUIDATION_LIMIT and symbol not in TOP_50_BINANCE:
+
+            if notional >= LIQUIDATION_LIMIT and symbol not in TOP_50_BINANCE and symbol not in TOP_50_BYBIT:
                 liquidation_type = "Short" if side == "BUY" else "Long"
                 if symbol not in bybit_symbol:
                     await message_binance(-1002304776308, symbol, liquidation_type, f'{notional:.2f}', price)
