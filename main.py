@@ -112,14 +112,14 @@ async def on_message(message):
             qty = float(order["q"])  # Количество монет
             price = float(order["p"])  # Цена ликвидации
             notional = qty * price  # Сумма ликвидации в USDT
-
-            if notional >= LIQUIDATION_LIMIT and symbol not in TOP_50_BINANCE and symbol not in TOP_50_BYBIT:
-                liquidation_type = "Short" if side == "BUY" else "Long"
-                if symbol not in bybit_symbol:
-                    await message_binance(-1002304776308, symbol, liquidation_type, f'{notional:.2f}', price)
-                else:
-                    await message_bybit_binance(-1002304776308, symbol, liquidation_type, f'{notional:.2f}', price)
-                logger.info(f"Обработано событие ликвидации: {symbol}, Тип: {liquidation_type}, Сумма: {notional:.2f} USDT")
+            if 'USDT' in symbol:
+                if notional >= LIQUIDATION_LIMIT and symbol not in TOP_50_BINANCE and symbol not in TOP_50_BYBIT:
+                    liquidation_type = "Short" if side == "BUY" else "Long"
+                    if symbol not in bybit_symbol:
+                        await message_binance(-1002304776308, symbol, liquidation_type, f'{notional:.2f}', price)
+                    else:
+                        await message_bybit_binance(-1002304776308, symbol, liquidation_type, f'{notional:.2f}', price)
+                    logger.info(f"Обработано событие ликвидации: {symbol}, Тип: {liquidation_type}, Сумма: {notional:.2f} USDT")
     except Exception as e:
         logger.error(f"Ошибка при обработке сообщения WebSocket: {e}")
 
